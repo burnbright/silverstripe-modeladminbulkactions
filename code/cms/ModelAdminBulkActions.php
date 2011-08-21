@@ -9,6 +9,7 @@ class ModelAdminBulkActions_CollectionController extends ModelAdmin_CollectionCo
 	public function ResultsForm($searchCriteria){
 		$form = parent::ResultsForm($searchCriteria);
 		if($customactions = singleton($this->modelClass)->stat('modeladmin_actions')){
+			//TODO: only show if there are more than 0 records?
 			$form->Fields()->insertAfter(new InlineFormAction("customAction","Perform Action on Results"), "SearchResultsHeader");
 			$form->Fields()->insertAfter(new DropdownField("action","Action",$customactions), "SearchResultsHeader");
 		}
@@ -23,24 +24,52 @@ class ModelAdminBulkActions_CollectionController extends ModelAdmin_CollectionCo
 	 */
 	function customAction($data,$form){
 
-		if(isset($data['action'])){
-			if(method_exists($this,$data['action'])){
-				return $this->{$data['action']}($data);
-			}elseif(method_exists($this->parentController,$data['action'])){
-				return $this->parentController->{$data['action']}($data);
+		$message = "";
+		$code = 200;
+		$singleton = singleton($this->modelClass);
+
+		if(isset($data['action']) && $action = $data['action']){
+
+			$count = "";
+			if(method_exists($singleton,$action)){
+				$count = $this->bulkRun($data);
+
+				$message = sprintf(_t('ModelAdmin.CUSTOMACTION', 'Action "%2$s" has been performed on %3$d %1$s records.'),$singleton->i18n_singular_name(),$action,$count);
+			}else{
+				$message = "Action '$action' is not available.";
+				$code = 404;
 			}
-			//TODO: could provide result set looping, and calling action on each record controller.
+
+			//TODO: allow more cusomisation/control over what outputs, and what to search on (eg: YourModelAdmin)
+			//TODO: provide information on how many operations were successful or not
+
+		}else{
+			$message = "Action was not found";
+			$code = 404;
 		}
 
-		FormResponse::error("Action not found");
-		FormResponse::respond();
-		return;
+		$form =  $this->ResultsForm($data);
+
+		return new SS_HTTPResponse($form->forAjaxTemplate(),$code,$message);
 	}
 
-	function bulkrun($action){
-		foreach($results as $result){
-			$result->{$action}();
+	function bulkrun($data){
+
+		if(isset($data['action']) && $action = $data['action']){
+			$dataQuery = $this->getSearchQuery($data);
+			$records = $dataQuery->execute();
+			$sourceClass = $this->modelClass;
+			$dataobject = new $sourceClass();
+			if($items = $dataobject->buildDataObjectSet($records, 'DataObjectSet')){
+				foreach($items as $item){
+					$output = $item->{$action}();
+					//TODO: do something with output?
+				}
+				return $items->Count();
+			}
 		}
+
+		return false;
 	}
 
 }
