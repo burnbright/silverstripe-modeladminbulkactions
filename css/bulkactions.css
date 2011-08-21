@@ -1,0 +1,11 @@
+#Form_ResultsForm #action,
+#Form_ResultsForm #action *,
+#Form_ResultsForm #customAction,
+#Form_ResultsForm #customAction *{
+	display:inline;
+	clear:none;
+}
+
+	#Form_ResultsForm #action option{
+		display:block;	
+	}
